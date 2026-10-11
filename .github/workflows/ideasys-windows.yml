@@ -8,7 +8,7 @@ on:
     inputs:
       tag:
         description: "Tag da release"
-        default: "ideasys-1.5.0"
+        default: "suporteideasoft-1.5.0"
 
 permissions:
   contents: write
@@ -140,6 +140,28 @@ jobs:
           Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
           mv -Force .\usbmmidd_v2 ./rustdesk
 
+          # driver de impressora remota (mesmo do build oficial, conferido por sha256)
+          try {
+            Invoke-WebRequest -Uri https://github.com/rustdesk/hbb_common/releases/download/driver/rustdesk_printer_driver_v4-1.4.zip -OutFile rustdesk_printer_driver_v4-1.4.zip
+            Invoke-WebRequest -Uri https://github.com/rustdesk/hbb_common/releases/download/driver/printer_driver_adapter.zip -OutFile printer_driver_adapter.zip
+            Invoke-WebRequest -Uri https://github.com/rustdesk/hbb_common/releases/download/driver/sha256sums -OutFile sha256sums
+            $checksum_driver = (Select-String -Path .\sha256sums -Pattern '^([a-fA-F0-9]{64}) \*rustdesk_printer_driver_v4-1.4\.zip$').Matches.Groups[1].Value
+            $downloadsum_driver = Get-FileHash -Path rustdesk_printer_driver_v4-1.4.zip -Algorithm SHA256
+            $checksum_adapter = (Select-String -Path .\sha256sums -Pattern '^([a-fA-F0-9]{64}) \*printer_driver_adapter\.zip$').Matches.Groups[1].Value
+            $downloadsum_adapter = Get-FileHash -Path printer_driver_adapter.zip -Algorithm SHA256
+            if ($checksum_driver -eq $downloadsum_driver.Hash -and $checksum_adapter -eq $downloadsum_adapter.Hash) {
+                Expand-Archive rustdesk_printer_driver_v4-1.4.zip -DestinationPath .
+                mkdir ./rustdesk/drivers
+                mv -Force .\rustdesk_printer_driver_v4-1.4 ./rustdesk/drivers/RustDeskPrinterDriver
+                Expand-Archive printer_driver_adapter.zip -DestinationPath .
+                mv -Force .\printer_driver_adapter.dll ./rustdesk
+            } else {
+                Write-Output "driver de impressora: checksum nao confere, ignorado"
+            }
+          } catch {
+              Write-Host "driver de impressora: erro ignorado"
+          }
+
       - name: find Runner.res
         continue-on-error: true
         shell: bash
@@ -162,16 +184,18 @@ jobs:
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          # a instalacao copia a pasta e registra "<APP_NAME>.exe"; o exe tem que ter esse nome
+          mv ./rustdesk/rustdesk.exe ./rustdesk/${APP_EXE}.exe
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/${APP_EXE}.exe
           popd
           mkdir -p ./SaidaIdeaSys
-          mv ./target/release/rustdesk-portable-packer.exe ./SaidaIdeaSys/IdeaSys.exe
-          sha256sum ./SaidaIdeaSys/IdeaSys.exe
+          mv ./target/release/rustdesk-portable-packer.exe ./SaidaIdeaSys/${APP_EXE}.exe
+          sha256sum ./SaidaIdeaSys/${APP_EXE}.exe
 
-      - name: Upload IdeaSys.exe
+      - name: Upload exe
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: IdeaSys-windows-x64
+          name: SuporteIdeaSoft-windows-x64
           path: ./SaidaIdeaSys
 
       - name: Publish Release
@@ -179,7 +203,7 @@ jobs:
         with:
           prerelease: false
           tag_name: ${{ inputs.tag }}
-          name: IdeaSys ${{ env.VERSION }}
-          body: "IdeaSys - Suporte especializado Idea Sistemas. Baseado no RustDesk ${{ env.VERSION }} (AGPL-3.0); codigo-fonte neste repositorio."
+          name: Suporte IdeaSoft ${{ env.VERSION }}
+          body: "Suporte IdeaSoft - Suporte especializado Idea Sistemas. Baseado no RustDesk ${{ env.VERSION }} (AGPL-3.0); codigo-fonte neste repositorio."
           files: |
-            ./SaidaIdeaSys/IdeaSys.exe
+            ./SaidaIdeaSys/${{ env.APP_EXE }}.exe

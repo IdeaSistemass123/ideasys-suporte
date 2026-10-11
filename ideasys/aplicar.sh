@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Personalizacao IdeaSys sobre o codigo do RustDesk.
+# Personalizacao "Suporte IdeaSoft" sobre o codigo do RustDesk.
 # Roda na raiz do repositorio, DEPOIS do checkout com submodulos.
 set -euo pipefail
 
 SERVIDOR="suporte.ideasys.com.br"
 CHAVE="N27etiLttIIPEwsEFk8SfxzGwBS15xKD8XvCNeD1uY0="
-NOME="IdeaSys"
-DESCRICAO="IdeaSys - Suporte especializado Idea Sistemas"
+# NOME interno SEM ESPACO: vira servico do Windows, pasta, nome do .exe e esquema de link,
+# e o RustDesk monta comandos "sc stop NOME" / "taskkill /IM NOME.exe" sem aspas.
+NOME="SuporteIdeaSoft"
+NOME_EXIBIDO="Suporte IdeaSoft"
+DESCRICAO="Suporte IdeaSoft - Suporte especializado Idea Sistemas"
 EMPRESA="Idea Sistemas"
 
 CFG=libs/hbb_common/src/config.rs
@@ -25,8 +28,18 @@ grep -q "RwLock::new(\"$NOME\".to_owned())" "$CFG" || { echo "falhou: nome"; exi
 RC=flutter/windows/runner/Runner.rc
 sed -i "s|VALUE \"CompanyName\", \".*\" \"\\\\0\"|VALUE \"CompanyName\", \"$EMPRESA\" \"\\\\0\"|" "$RC"
 sed -i "s|VALUE \"FileDescription\", \".*\" \"\\\\0\"|VALUE \"FileDescription\", \"$DESCRICAO\" \"\\\\0\"|" "$RC"
-sed -i "s|VALUE \"ProductName\", \".*\" \"\\\\0\"|VALUE \"ProductName\", \"$NOME\" \"\\\\0\"|" "$RC"
+sed -i "s|VALUE \"ProductName\", \".*\" \"\\\\0\"|VALUE \"ProductName\", \"$NOME_EXIBIDO\" \"\\\\0\"|" "$RC"
+sed -i "s|VALUE \"OriginalFilename\", \".*\" \"\\\\0\"|VALUE \"OriginalFilename\", \"$NOME.exe\" \"\\\\0\"|" "$RC"
 grep -q "\"$DESCRICAO\"" "$RC" || { echo "falhou: Runner.rc"; exit 1; }
+
+# propriedades do empacotador portatil e da dll (winres nos Cargo.toml)
+for T in Cargo.toml libs/portable/Cargo.toml; do
+  sed -i "s|^ProductName = \".*\"|ProductName = \"$NOME_EXIBIDO\"|" "$T"
+  sed -i "/^ProductName = /a CompanyName = \"$EMPRESA\"" "$T"
+  sed -i "s|^FileDescription = \".*\"|FileDescription = \"$DESCRICAO\"|" "$T"
+  sed -i "s|^OriginalFilename = \".*\"|OriginalFilename = \"$NOME.exe\"|" "$T"
+  grep -q "^FileDescription = \"$DESCRICAO\"" "$T" || { echo "falhou: $T"; exit 1; }
+done
 
 # icones e logo
 cp ideasys/icone.ico flutter/windows/runner/resources/app_icon.ico
@@ -36,6 +49,8 @@ cp ideasys/icone.png res/icon.png
 cp ideasys/icone.png flutter/assets/icon.png
 cp ideasys/logo.png  flutter/assets/logo.png
 
-echo "Personalizacao IdeaSys aplicada:"
+echo "Personalizacao $NOME_EXIBIDO aplicada:"
 grep -n -E "^pub const RENDEZVOUS_SERVERS|^pub const RS_PUB_KEY|APP_NAME: RwLock" "$CFG"
-grep -n -E "CompanyName|FileDescription|ProductName" "$RC"
+grep -n -E "CompanyName|FileDescription|ProductName|OriginalFilename" "$RC" Cargo.toml libs/portable/Cargo.toml
+# o workflow le o nome do .exe daqui
+[ -n "${GITHUB_ENV:-}" ] && echo "APP_EXE=$NOME" >> "$GITHUB_ENV" || true
