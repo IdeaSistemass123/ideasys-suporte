@@ -14,6 +14,10 @@ use crate::{
 // Empirical no-data window before exposing the restart reconnect state to the UI.
 // Restart msgbox text is kept as a legacy UI fallback; Flutter handles the type as a control event.
 const RESTART_REMOTE_DEVICE_NO_DATA_TIMEOUT: Duration = Duration::from_secs(5);
+// IdeaSys: the controlled side sends TestDelay every second and waits for the reply, so a
+// healthy session never goes this long without data. Detect a silent drop here instead of
+// waiting for the 30s watchdog, which left the screen frozen before reconnecting.
+const NO_DATA_RECONNECT_TIMEOUT: Duration = Duration::from_secs(12);
 const KCP_CLOSE_REASON_FLUSH_DELAY: Duration = Duration::from_millis(30);
 // Deadline for the parting close-reason send once the peer is presumed gone; KCP waits for send
 // capacity with no deadline of its own.
@@ -329,6 +333,17 @@ impl<T: InvokeUiSession> Remote<T> {
                             }
                         }
                         _ = status_timer.tick() => {
+                            // Not while sending files: handle_read_jobs awaits sends inline and
+                            // can hold this loop on a slow uplink; the 30s watchdog covers that.
+                            if received
+                                && self.read_jobs.is_empty()
+                                && !self.handler.is_restarting_remote_device()
+                                && last_recv_time.elapsed() >= NO_DATA_RECONNECT_TIMEOUT
+                            {
+                                log::info!("No data for {:?}, reconnecting", last_recv_time.elapsed());
+                                self.handler.msgbox("error", "Connection Error", "Timeout", "");
+                                break;
+                            }
                             if self.handler.is_restarting_remote_device()
                                 && last_recv_time.elapsed() >= RESTART_REMOTE_DEVICE_NO_DATA_TIMEOUT
                             {

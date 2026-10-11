@@ -998,9 +998,12 @@ class FfiModel with ChangeNotifier {
     String title,
     String text,
   ) {
+    // IdeaSys: a session that was already up keeps retrying while the peer's
+    // internet comes back (router/4G drop), instead of giving up on the first
+    // "offline" or "Failed to connect via ..." of the reconnect attempt.
     if (type == 'error' &&
         title == 'Connection Error' &&
-        text == 'Remote desktop is offline' &&
+        _isTransientReconnectError(text) &&
         _pi.isSet.isTrue) {
       // Auto retry for ~30s (server's peer offline threshold) when controlled peer's account changes
       // (e.g., signout, switch user, login into OS) causes temporary offline via websocket/tcp connection.
@@ -1015,12 +1018,24 @@ class FfiModel with ChangeNotifier {
       } else {
         final elapsed =
             DateTime.now().difference(_offlineReconnectStartTime!).inSeconds;
-        if (elapsed < 30) {
+        if (elapsed < kTransientReconnectWindowSecs) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  static const kTransientReconnectWindowSecs = 180;
+  static const kMaxReconnectDelaySecs = 3;
+
+  static bool _isTransientReconnectError(String text) {
+    return text == 'Remote desktop is offline' ||
+        text.startsWith('Failed to connect via rendezvous server') ||
+        text.startsWith('Failed to connect via relay server') ||
+        text.startsWith('Failed to connect to rendezvous server') ||
+        text.startsWith('Failed to connect to relay server') ||
+        text == 'Timeout';
   }
 
   handleToast(Map<String, dynamic> evt, SessionID sessionId, String peerId) {
@@ -1089,7 +1104,8 @@ class FfiModel with ChangeNotifier {
       _timer = Timer(Duration(seconds: _reconnects), () {
         reconnect(dialogManager, sessionId, false);
       });
-      _reconnects *= 2;
+      // IdeaSys: 1, 2, 3, 3, 3... instead of doubling without limit.
+      _reconnects = min(_reconnects * 2, kMaxReconnectDelaySecs);
     } else {
       _reconnects = 1;
       _offlineReconnectStartTime = null;
