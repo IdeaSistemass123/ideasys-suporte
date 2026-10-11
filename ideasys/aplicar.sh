@@ -3,7 +3,7 @@
 # Roda na raiz do repositorio, DEPOIS do checkout com submodulos.
 set -euo pipefail
 
-SERVIDOR="suporte.ideasysapp.com.br"
+SERVIDOR="suporte.ideasys.com.br"
 CHAVE="N27etiLttIIPEwsEFk8SfxzGwBS15xKD8XvCNeD1uY0="
 NOME="IdeaSys"
 DESCRICAO="IdeaSys - Suporte especializado Idea Sistemas"
