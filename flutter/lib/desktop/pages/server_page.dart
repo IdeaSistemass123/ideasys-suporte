@@ -1106,7 +1106,7 @@ class _CmControlPanel extends StatelessWidget {
                   children: [
                     buildButton(
                       context,
-                      color: MyTheme.accent,
+                      color: const Color(0xFF16A34A), // IdeaSys: aceitar em verde
                       onClick: () {
                         handleAccept(context);
                         windowManager.minimize();
@@ -1161,7 +1161,7 @@ class _CmControlPanel extends StatelessWidget {
     }
     final borderRadius = BorderRadius.circular(10.0);
     final btn = Container(
-      height: 28,
+      height: 40, // IdeaSys: botoes maiores (era 28)
       decoration: BoxDecoration(
           color: color, borderRadius: borderRadius, border: border),
       child: InkWell(

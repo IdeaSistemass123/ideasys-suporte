@@ -28,7 +28,7 @@ grep -q "^    \"$API\".to_owned()$" src/common.rs || { echo "falhou: api"; exit 
 
 # Sem login de conta: com conta logada o cliente manda token e exige do hbbs uma troca de chaves
 # que o hbbs de codigo aberto nao faz ("Failed to secure tcp: deadline has elapsed").
-sed -i 's|^    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();$|    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new([("disable-account".to_owned(), "Y".to_owned())].into_iter().collect());|' "$CFG"
+sed -i 's|^    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();$|    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("disable-account".to_owned(), "Y".to_owned())]));|' "$CFG"
 grep -q '("disable-account".to_owned(), "Y".to_owned())' "$CFG" || { echo "falhou: disable-account"; exit 1; }
 # e ignora token que tenha ficado de um login feito em versao anterior
 sed -i 's|^    let token = LocalConfig::get_option("access_token");$|    let token = if hbb_common::config::is_disable_account() { String::new() } else { LocalConfig::get_option("access_token") };|' src/ui_session_interface.rs

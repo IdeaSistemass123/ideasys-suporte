@@ -51,6 +51,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   bool isCardClosed = false;
 
   final RxBool _editHover = false.obs;
+  // IdeaSys: nome do cliente (opcao preset-note); vai para o painel junto com os dados da maquina
+  final RxString _clienteNome = ''.obs;
   final RxBool _block = false.obs;
 
   final GlobalKey _childKey = GlobalKey();
@@ -220,6 +222,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   ?.color
                                   ?.withOpacity(0.5)),
                         ).marginOnly(top: 5),
+                        Flexible(child: _buildClienteNome(context)),
                         buildPopupMenu(context)
                       ],
                     ),
@@ -251,6 +254,71 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         ],
       ),
     );
+  }
+
+  Widget _buildClienteNome(BuildContext context) {
+    final cor = Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6);
+    return Obx(() => InkWell(
+          onTap: _pedirNomeCliente,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  _clienteNome.value.isEmpty
+                      ? 'Informar cliente'
+                      : _clienteNome.value,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: cor),
+                ),
+              ),
+              Icon(Icons.edit_outlined, size: 14, color: cor).marginOnly(left: 3),
+            ],
+          ),
+        )).marginOnly(top: 5, left: 10, right: 6);
+  }
+
+  void _pedirNomeCliente() {
+    final ctrl = TextEditingController(text: _clienteNome.value);
+    var erro = '';
+    gFFI.dialogManager.show((setState, close, context) {
+      submit() async {
+        final nome = ctrl.text.trim();
+        if (nome.isEmpty) {
+          setState(() => erro = 'Informe o nome do cliente');
+          return;
+        }
+        await bind.mainSetOption(key: kOptionIdeaSysCliente, value: nome);
+        _clienteNome.value = nome;
+        close();
+      }
+
+      return CustomAlertDialog(
+        title: const Text('Nome do cliente'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 400),
+          child: TextField(
+            controller: ctrl,
+            autofocus: true,
+            maxLength: 80,
+            decoration: InputDecoration(
+              labelText: 'Empresa ou nome do cliente',
+              errorText: erro.isEmpty ? null : erro,
+            ),
+            onChanged: (_) {
+              if (erro.isNotEmpty) setState(() => erro = '');
+            },
+            onSubmitted: (_) => submit(),
+          ),
+        ),
+        actions: [
+          dialogButton('Cancel', onPressed: close, isOutline: true),
+          dialogButton('OK', onPressed: submit),
+        ],
+        onSubmit: submit,
+        onCancel: close,
+      );
+    });
   }
 
   Widget buildPopupMenu(BuildContext context) {
@@ -842,6 +910,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     });
     _uniLinksSubscription = listenUniLinks();
+
+    _clienteNome.value = bind.mainGetOptionSync(key: kOptionIdeaSysCliente);
+    if (_clienteNome.value.trim().isEmpty && !bind.isOutgoingOnly()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _pedirNomeCliente());
+    }
 
     if (bind.isIncomingOnly()) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

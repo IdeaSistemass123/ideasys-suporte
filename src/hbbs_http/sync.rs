@@ -92,6 +92,8 @@ async fn start_hbbs_sync_async() {
     let mut last_sent: Option<Instant> = None;
     let mut info_uploaded = InfoUploaded::default();
     let mut sysinfo_ver = "".to_owned();
+    // IdeaSys: client name typed on the home page (preset-note); re-upload sysinfo when it changes.
+    let mut uploaded_note: Option<String> = None;
     loop {
         tokio::select! {
             _ = interval.tick() => {
@@ -127,7 +129,9 @@ async fn start_hbbs_sync_async() {
                 let sys_username = v["username"].as_str().unwrap_or_default().to_string();
                 // Though the username comparison is only necessary on Windows,
                 // we still keep the comparison on other platforms for consistency.
-                let need_upload = (!info_uploaded.uploaded || info_uploaded.username.as_ref() != Some(&sys_username)) &&
+                let cur_note = Config::get_option(keys::OPTION_PRESET_NOTE);
+                let need_upload = (!info_uploaded.uploaded || info_uploaded.username.as_ref() != Some(&sys_username)
+                    || uploaded_note.as_deref() != Some(cur_note.as_str())) &&
                     info_uploaded.last_uploaded.map(|x| x.elapsed() >= UPLOAD_SYSINFO_TIMEOUT).unwrap_or(true);
                 if need_upload {
                     v["version"] = json!(crate::VERSION);
@@ -212,6 +216,7 @@ async fn start_hbbs_sync_async() {
                         Ok(x)  => {
                             if x == "SYSINFO_UPDATED" {
                                 info_uploaded = InfoUploaded::uploaded(url.clone(), id.clone(), sys_username);
+                                uploaded_note = Some(cur_note.clone());
                                 log::info!("sysinfo updated");
                                 if !hash.is_empty() {
                                     config::Status::set("sysinfo_hash", hash);

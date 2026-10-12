@@ -349,8 +349,12 @@ extension StringExtension on String {
   String get nonBreaking => replaceAll(' ', String.fromCharCode($nbsp));
 }
 
-const Size kConnectionManagerWindowSizeClosedChat = Size(300, 490);
-const Size kConnectionManagerWindowSizeOpenChat = Size(700, 490);
+// IdeaSys: nome do cliente perguntado ao abrir; o sysinfo leva "preset-note" para o painel
+const String kOptionIdeaSysCliente = "preset-note";
+
+// IdeaSys: janela de aceitar maior
+const Size kConnectionManagerWindowSizeClosedChat = Size(420, 620);
+const Size kConnectionManagerWindowSizeOpenChat = Size(820, 620);
 // Tabbar transition duration, now we remove the duration
 const Duration kTabTransitionDuration = Duration.zero;
 const double kEmptyMarginTop = 50;
