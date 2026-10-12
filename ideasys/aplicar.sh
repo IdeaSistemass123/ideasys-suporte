@@ -26,6 +26,14 @@ sed -i "s|APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())|APP_NA
 sed -i "s|^    \"https://admin.rustdesk.com\".to_owned()$|    \"$API\".to_owned()|" src/common.rs
 grep -q "^    \"$API\".to_owned()$" src/common.rs || { echo "falhou: api"; exit 1; }
 
+# Sem login de conta: com conta logada o cliente manda token e exige do hbbs uma troca de chaves
+# que o hbbs de codigo aberto nao faz ("Failed to secure tcp: deadline has elapsed").
+sed -i 's|^    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();$|    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new([("disable-account".to_owned(), "Y".to_owned())].into_iter().collect());|' "$CFG"
+grep -q '("disable-account".to_owned(), "Y".to_owned())' "$CFG" || { echo "falhou: disable-account"; exit 1; }
+# e ignora token que tenha ficado de um login feito em versao anterior
+sed -i 's|^    let token = LocalConfig::get_option("access_token");$|    let token = if hbb_common::config::is_disable_account() { String::new() } else { LocalConfig::get_option("access_token") };|' src/ui_session_interface.rs
+grep -q 'let token = if hbb_common::config::is_disable_account()' src/ui_session_interface.rs || { echo "falhou: token"; exit 1; }
+
 grep -q "\"$SERVIDOR\"" "$CFG" || { echo "falhou: servidor"; exit 1; }
 grep -q "\"$CHAVE\"" "$CFG" || { echo "falhou: chave"; exit 1; }
 grep -q "RwLock::new(\"$NOME\".to_owned())" "$CFG" || { echo "falhou: nome"; exit 1; }
