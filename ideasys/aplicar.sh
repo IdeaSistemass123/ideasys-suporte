@@ -5,6 +5,7 @@ set -euo pipefail
 
 SERVIDOR="suporte.ideasys.com.br"
 CHAVE="N27etiLttIIPEwsEFk8SfxzGwBS15xKD8XvCNeD1uY0="
+API="https://suporte.ideasys.com.br"
 # NOME interno SEM ESPACO: vira servico do Windows, pasta, nome do .exe e esquema de link,
 # e o RustDesk monta comandos "sc stop NOME" / "taskkill /IM NOME.exe" sem aspas.
 NOME="SuporteIdeaSoft"
@@ -19,6 +20,11 @@ sed -i "s|^pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[.*\];|pub const RENDEZVO
 sed -i "s|^pub const RS_PUB_KEY: &str = \".*\";|pub const RS_PUB_KEY: \&str = \"$CHAVE\";|" "$CFG"
 # nome do programa (pasta de instalacao, servico, atalhos, titulo)
 sed -i "s|APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())|APP_NAME: RwLock<String> = RwLock::new(\"$NOME\".to_owned())|" "$CFG"
+
+# API propria (heartbeat, dados da maquina e auditoria de sessoes -> painel em /painel).
+# Sem isso o endereco cai no admin.rustdesk.com e o cliente desliga o envio.
+sed -i "s|^    \"https://admin.rustdesk.com\".to_owned()$|    \"$API\".to_owned()|" src/common.rs
+grep -q "^    \"$API\".to_owned()$" src/common.rs || { echo "falhou: api"; exit 1; }
 
 grep -q "\"$SERVIDOR\"" "$CFG" || { echo "falhou: servidor"; exit 1; }
 grep -q "\"$CHAVE\"" "$CFG" || { echo "falhou: chave"; exit 1; }
