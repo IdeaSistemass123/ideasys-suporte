@@ -182,10 +182,11 @@ jobs:
         shell: bash
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
-          pushd ./libs/portable
-          pip3 install -r requirements.txt
           # a instalacao copia a pasta e registra "<APP_NAME>.exe"; o exe tem que ter esse nome
           mv ./rustdesk/rustdesk.exe ./rustdesk/${APP_EXE}.exe
+          ls -l ./rustdesk/${APP_EXE}.exe
+          pushd ./libs/portable
+          pip3 install -r requirements.txt
           python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/${APP_EXE}.exe
           popd
           mkdir -p ./SaidaIdeaSys
