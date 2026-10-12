@@ -21,6 +21,8 @@ env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VERSION: "1.5.0"
+  # numero da versao IdeaSys (atualizacao automatica): o numero sequencial do GitHub
+  IDEASYS_BUILD: ${{ github.run_number }}
 
 jobs:
   generate-bridge:
@@ -215,10 +217,16 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           ARQ="./SaidaIdeaSys/${APP_EXE}.exe"
+          # numero + sha256 para o PUBLICAR.ps1 (atualizacao automatica, igual ao Sistema.exe)
+          JSON="./SaidaIdeaSys/${APP_EXE}.json"
+          SHA=$(sha256sum "$ARQ" | cut -d" " -f1)
+          TAM=$(stat -c %s "$ARQ")
+          echo "{\"number\": $IDEASYS_BUILD, \"sha256\": \"$SHA\", \"size\": $TAM, \"commit\": \"$GITHUB_SHA\"}" > "$JSON"
+          cat "$JSON"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "$ARQ" --clobber
+            gh release upload "$TAG" "$ARQ" "$JSON" --clobber
           else
-            gh release create "$TAG" "$ARQ" --target "$GITHUB_SHA" \
+            gh release create "$TAG" "$ARQ" "$JSON" --target "$GITHUB_SHA" \
               --title "Suporte IdeaSoft ${VERSION}" \
               --notes "Suporte IdeaSoft - Suporte especializado Idea Sistemas. Baseado no RustDesk ${VERSION} (AGPL-3.0); codigo-fonte neste repositorio."
           fi

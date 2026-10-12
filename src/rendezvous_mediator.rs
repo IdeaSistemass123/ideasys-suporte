@@ -281,7 +281,8 @@ impl RendezvousMediator {
         crate::hbbs_http::sync::start();
         #[cfg(target_os = "windows")]
         if crate::platform::is_installed() && crate::is_server() {
-            crate::updater::start_auto_update();
+            // IdeaSys: own update channel instead of the stock one (api.rustdesk.com)
+            crate::updater::start_ideasys_update();
         }
         check_zombie();
         let server = new_server();

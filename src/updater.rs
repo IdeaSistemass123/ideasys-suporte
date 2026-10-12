@@ -655,6 +655,90 @@ pub fn check_update_as_root() -> ResultType<bool> {
     result.map(|_| true)
 }
 
+// ---------------------------------------------------------------------------
+// IdeaSys: auto-update from our own server, the same model as Sistema.exe.
+// The server publishes a build number (versao.json); a number higher than the
+// one compiled in (IDEASYS_BUILD = GitHub run number) downloads the exe, checks
+// its sha256 and installs it through update_new_version (`--update`), only
+// while nobody is connected. The stock updater (api.rustdesk.com) stays off:
+// it would install the official RustDesk over this client.
+// ---------------------------------------------------------------------------
+pub const IDEASYS_UPDATE_URL: &str = "https://suporte.ideasys.com.br/api/atualizacao/versao.json";
+const IDEASYS_UPDATE_HOST: &str = "https://suporte.ideasys.com.br/";
+
+pub fn ideasys_build() -> u32 {
+    option_env!("IDEASYS_BUILD")
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+#[cfg(target_os = "windows")]
+pub fn start_ideasys_update() {
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(60));
+        loop {
+            let espera = match ideasys_check_update() {
+                Ok(()) => Duration::from_secs(60 * 60),
+                Err(e) => {
+                    log::warn!("IdeaSys update: {}", e);
+                    Duration::from_secs(60 * 15)
+                }
+            };
+            std::thread::sleep(espera);
+        }
+    });
+}
+
+#[cfg(target_os = "windows")]
+fn ideasys_check_update() -> ResultType<()> {
+    let local = ideasys_build();
+    if local == 0 {
+        // build without a number (local/dev): never replaces itself
+        return Ok(());
+    }
+    let client = create_http_client_with_url_strict(IDEASYS_UPDATE_URL)?;
+    let resp = client.get(IDEASYS_UPDATE_URL).send()?;
+    if !resp.status().is_success() {
+        bail!("versao.json: HTTP {}", resp.status());
+    }
+    let v: serde_json::Value = serde_json::from_slice(&resp.bytes()?)?;
+    let number = v["number"].as_u64().unwrap_or(0);
+    if number <= local as u64 {
+        return Ok(());
+    }
+    let url = v["url"].as_str().unwrap_or_default().to_owned();
+    let sha = v["sha256"].as_str().unwrap_or_default().to_lowercase();
+    if !url.starts_with(IDEASYS_UPDATE_HOST) || sha.len() != 64 {
+        bail!("versao.json invalido");
+    }
+    if !has_no_active_conns() {
+        log::info!("IdeaSys update {} -> {}: waiting, active connections", local, number);
+        return Ok(());
+    }
+    log::info!("IdeaSys update {} -> {}: downloading {}", local, number, url);
+    let data = client.get(&url).send()?;
+    if !data.status().is_success() {
+        bail!("download: HTTP {}", data.status());
+    }
+    let bytes = data.bytes()?;
+    use sha2::{Digest, Sha256};
+    let got = format!("{:x}", Sha256::digest(&bytes));
+    if got != sha {
+        bail!("sha256 diferente: esperado {}, baixado {}", sha, got);
+    }
+    let dir = std::env::temp_dir().join("ideasys-update");
+    std::fs::create_dir_all(&dir)?;
+    let file_path = dir.join(format!("{}.exe", crate::get_app_name()));
+    std::fs::File::create(&file_path)?.write_all(&bytes)?;
+    // checked before the download too; a session may have started meanwhile
+    if has_no_active_conns() {
+        update_new_version(false, &number.to_string(), &file_path);
+    } else {
+        std::fs::remove_file(&file_path).ok();
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::get_download_file_from_url;

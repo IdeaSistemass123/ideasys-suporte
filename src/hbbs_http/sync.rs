@@ -135,6 +135,10 @@ async fn start_hbbs_sync_async() {
                     info_uploaded.last_uploaded.map(|x| x.elapsed() >= UPLOAD_SYSINFO_TIMEOUT).unwrap_or(true);
                 if need_upload {
                     v["version"] = json!(crate::VERSION);
+                    // IdeaSys: build number (auto-update channel), shown in the panel
+                    v["ideasys_build"] = json!(option_env!("IDEASYS_BUILD")
+                        .and_then(|s| s.trim().parse::<u32>().ok())
+                        .unwrap_or(0));
                     v["id"] = json!(id);
                     v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));
                     let ab_name = Config::get_option(keys::OPTION_PRESET_ADDRESS_BOOK_NAME);
