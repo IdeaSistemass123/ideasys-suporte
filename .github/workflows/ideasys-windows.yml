@@ -207,12 +207,19 @@ jobs:
           name: SuporteIdeaSoft-windows-x64
           path: ./SaidaIdeaSys
 
+      # Troca o .exe no lugar (--clobber): o link de download nunca fica fora do ar.
       - name: Publish Release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
-        with:
-          prerelease: false
-          tag_name: ${{ inputs.tag }}
-          name: Suporte IdeaSoft ${{ env.VERSION }}
-          body: "Suporte IdeaSoft - Suporte especializado Idea Sistemas. Baseado no RustDesk ${{ env.VERSION }} (AGPL-3.0); codigo-fonte neste repositorio."
-          files: |
-            ./SaidaIdeaSys/${{ env.APP_EXE }}.exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          ARQ="./SaidaIdeaSys/${APP_EXE}.exe"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$ARQ" --clobber
+          else
+            gh release create "$TAG" "$ARQ" --target "$GITHUB_SHA" \
+              --title "Suporte IdeaSoft ${VERSION}" \
+              --notes "Suporte IdeaSoft - Suporte especializado Idea Sistemas. Baseado no RustDesk ${VERSION} (AGPL-3.0); codigo-fonte neste repositorio."
+          fi
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
