@@ -109,6 +109,14 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
+      # A pasta de bibliotecas pronta (ffmpeg, vpx, aom, opus...) volta inteira em ~1 min;
+      # o cache binario do vcpkg levava ~13 min restaurando pacote por pacote.
+      - name: Cache vcpkg installed
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-installed-x64-windows-static-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**') }}
+
       - name: Install vcpkg dependencies
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
